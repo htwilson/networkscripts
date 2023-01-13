@@ -91,7 +91,7 @@ def main():
             if "Please press any key to reboot." in readdata:
                 break
     
-    print ("Script complete. Device safe to unplug Terminating program.")
+    print ("Script complete. Device safe to unplug. Terminating program.")
 
     #Close the serial connection and file, exit program  
     serObj.close()
