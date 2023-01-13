@@ -131,7 +131,7 @@ def ReadUntilStringIsFound(string, cmd, serialConn, file):
 
 #Logs into the device and enters the CLI 
 def LoginRoot(serialConn, file):    
-    print("Device booting up. This may take a moment..")
+    print("Device booting up. This may take a moment...")
     #keep reading from the terminal until there is "login:"
     ReadUntilStringIsFound('login: ', 'root\r', serialConn, file)
     print("Entering default credentials...")
