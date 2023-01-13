@@ -2,7 +2,7 @@
 Python Script for Juniper EX3300 Testing
 Dev: Hugo Wilson 
 1/13/2023
-Ver 1.0
+Ver 1.01
 '''
 
 import time
@@ -12,20 +12,21 @@ import os.path
 
 '''
 THIS SCRIPT WILL NOT BE ABLE TO HANDLE PASSWORD RESETS FOR NOW
-Commmand line inputs are: script.py COM# LPN###
+Commmand line inputs are: script.py COM# LPN### Device###
 '''
 def main():
     #get the  number of arguments input into the cmd line
     numArg = len(sys.argv)
 
     #error check the number of arguments
-    if numArg != 3:
-        print("Invalid arguments. Expected 2. Commmand line format is: script.py COM# LPN###")
+    if numArg != 4:
+        print("Invalid arguments. Expected 2. Commmand line format is: script.py COM# LPN### DEVICE####")
         exit(-1)
 
     #error check the arguments to make sure they are valid. 
     connNum = sys.argv[1]
     lpn = sys.argv[2]
+    devID = sys.argv[3]
 
     if connNum[:3] != 'COM'and connNum[3:].isdigit() is False:
         print("Invalid Serial Console ID. Terminating program.")
@@ -39,6 +40,12 @@ def main():
             exit(-1)
     else:
         print("Invalid LPN. Terminating program.")
+        exit(-1)
+
+    #Check that there is a valid device ID
+
+    if devID.upper() != 'EX3300' and devID.upper() != 'QFX5100':
+        print("Invalid device ID. Use QFX5100 or EX3300. Terminating program.")
         exit(-1)
 
     #https://semfionetworks.com/blog/establish-a-console-connection-within-a-python-script-with-pyserial/
@@ -62,12 +69,27 @@ def main():
     #open the file to write to
     # cwd = os.getcwd()
     # print("Current working directory: {0}".format(cwd))
+    try:
+        fileObj = open(lpn + '.txt', 'w')
+    except:
+        print("Unable to open file for writing connection. Terminating program.")
+        exit(-1)
 
-    fileObj = open(lpn + '.txt', 'w')
-
+    print(f'Running testing script for Juniper {devID.upper()}')
 
     #Run the command helper functions
     LoginRoot(serObj, fileObj)
+
+    #remove the cli spam if QFX5100 
+    if devID.upper() == 'QFX5100':
+        ConfigSpam(serObj, fileObj)
+    
+    #Check the license information
+    ShowSysLicense(serObj, fileObj)
+
+    #delete the license information if it exists
+    #deleteLicenseInfo()
+
     ShowVersion(serObj, fileObj)
     ShowConfig(serObj, fileObj)
     ShowChasFw(serObj, fileObj)
@@ -75,10 +97,11 @@ def main():
     ShowChasEnv(serObj, fileObj)
     ShowSysAlarms(serObj, fileObj)
     ShowSysStorage(serObj, fileObj)
-    ShowSysLicense(serObj, fileObj)
+    
     ShowIntTerse(serObj, fileObj)
     ReqSysZero(serObj, fileObj)
     LoginRoot(serObj, fileObj)
+    ShowSysLicense(serObj, fileObj)
     ReqPwrOff(serObj, fileObj)
     #Logout(serObj, fileObj)
     
@@ -112,7 +135,7 @@ def ReadUntilStringIsFound(string, cmd, serialConn, file):
                 # print(readdata.strip() + '\n')
                 # print(string)
                 #If a command is specified, write the command to the serial connection, else ignore
-                if cmd is not "NO_CMD":
+                if cmd != "NO_CMD":
                     serialConn.write(cmd.encode("utf-8"))
                     time.sleep(1)
                 break
@@ -120,11 +143,11 @@ def ReadUntilStringIsFound(string, cmd, serialConn, file):
         else:
             #if 2 minutes of no response has elapsed, shutdown program
             if counter > 120:
-                print("Serial connection unresponive. Please manually check the device.")
+                print("Serial connection unresponive. 120 second timeout. Please manually check the device.")
                 file.close()
                 exit(-1)
-            counter+=1 
-            time.sleep(1)
+            counter+=1
+            print(counter)
     return None
 
 #Logs into the device and enters the CLI 
@@ -164,19 +187,19 @@ def ShowChasFw(serialConn, file):
 #Runs the show chassis hardware command 
 def ShowChasHw(serialConn, file):
     print("Running show chassis hardware...")
-    ReadUntilStringIsFound('root>', 'show chassis hardware\r', serialConn,file)
+    ReadUntilStringIsFound('root>', 'show chassis hardware | no-more\r', serialConn,file)
     return None 
 
 #Runs the show chassis environment command 
 def ShowChasEnv(serialConn, file):
     print("Running show chassis environment...")
-    ReadUntilStringIsFound('root>', 'show chassis environment\r', serialConn,file)
+    ReadUntilStringIsFound('root>', 'show chassis environment | no-more\r', serialConn,file)
     return None
 
 #Runs the show system alarms command 
 def ShowSysAlarms(serialConn, file):
     print("Running show system alarms...")
-    ReadUntilStringIsFound('root>', 'show system alarms\r', serialConn,file)
+    ReadUntilStringIsFound('root>', 'show system alarms | no-more\r', serialConn,file)
     return None
 
 #Runs the show system storage command 
@@ -190,6 +213,14 @@ def ShowSysStorage(serialConn, file):
 def ShowSysLicense(serialConn, file):
     print("Running show system license...")
     ReadUntilStringIsFound('root>', 'show system license\r', serialConn,file)
+    # #read for customer information 
+    # ReadUntilStringIsFound('Customer ID: ', 'NO_CMD', serialConn,file)
+    return None
+
+# def DeleteSysLicense(serialConn, file):
+#     return None
+
+def findCustID(serialConn, file):
     return None
 
 #Runs the show interfaces terse command, ensure that hardware is plugged in prior to running
@@ -211,6 +242,18 @@ def ReqPwrOff(serialConn, file):
     print("Running graceful shutdown...")
     ReadUntilStringIsFound('root>', 'request system power-off\r', serialConn,file)
     ReadUntilStringIsFound('[yes,no] (no)', 'yes\r', serialConn, file)
+    return None
+
+def ConfigSpam(serialConn, file):
+    print("Entering config to remove auto-chassis...")
+    ReadUntilStringIsFound('root>', 'config\r', serialConn,file)
+    ReadUntilStringIsFound('root#', 'delete chassis auto-image-upgrade\r', serialConn,file)
+    ReadUntilStringIsFound('root#', 'set chassis alarm management-ethernet link down\r', serialConn,file)
+    ReadUntilStringIsFound('root#', 'set system root-authentication plain-text-password\r', serialConn, file)
+    ReadUntilStringIsFound('New password:', 'Password\r', serialConn,file)
+    ReadUntilStringIsFound('Retype new password:', 'Password\r', serialConn,file)
+    ReadUntilStringIsFound('root#', 'commit\r', serialConn,file)
+    ReadUntilStringIsFound('Root#', 'exit\r', serialConn,file)
     return None
 
 if __name__ == "__main__":
