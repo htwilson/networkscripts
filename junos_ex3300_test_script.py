@@ -63,8 +63,11 @@ def main():
     # cwd = os.getcwd()
     # print("Current working directory: {0}".format(cwd))
 
-    fileObj = open(lpn + '.txt', 'w')
-
+    try:
+        fileObj = open(lpn + '.txt', 'w')
+    except:
+        print("Unable to open file for writing connection. Terminating program.")
+        exit(-1)
 
     #Run the command helper functions
     LoginRoot(serObj, fileObj)
@@ -112,7 +115,7 @@ def ReadUntilStringIsFound(string, cmd, serialConn, file):
                 # print(readdata.strip() + '\n')
                 # print(string)
                 #If a command is specified, write the command to the serial connection, else ignore
-                if cmd is not "NO_CMD":
+                if cmd != "NO_CMD":
                     serialConn.write(cmd.encode("utf-8"))
                     time.sleep(1)
                 break
