@@ -90,12 +90,12 @@ def main():
     ShowChasHw(serObj, fileObj)
 
     #May have to wait until device quiets down, finishes testing
-    ShowChasEnv(serObj, fileObj)
+    ShowChasEnv(serObj, fileObj, devID)
 
     ShowSysAlarms(serObj, fileObj)
     ShowSysStorage(serObj, fileObj)
     #connect hardware and verify functionality 
-    ShowIntTerse(serObj, fileObj)
+    ShowIntTerse(serObj, fileObj, devID)
     #reset, reboot, power off
     ReqSysZero(serObj, fileObj)
     LoginRoot(serObj, fileObj)
@@ -130,7 +130,7 @@ def ReadFromSerial(keyword, serObj, fileObj):
 
         if len(readdata) != 0:
             counter = 0
-            print(readdata)
+            # print(readdata)
             fileObj.write(readdata.strip() + '\n')
             if keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #string <> string.strip()
                 print("FOUND KEYWORD")
@@ -160,7 +160,7 @@ def ParseLicenseFromSerial(serObj, fileObj):
 
         if len(readdata) != 0:
             counter = 0
-            print(readdata)
+            # print(readdata)
             fileObj.write(readdata.strip() + '\n')
 
             if "License identifier:" in readdata.strip():
@@ -168,7 +168,6 @@ def ParseLicenseFromSerial(serObj, fileObj):
             elif "Customer ID:" in readdata.strip():
                 custID.append(readdata.strip().split()[-1])
             elif keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #string <> string.strip()
-                print("FOUND KEYWORD")
                 break
         else:
             counter += 1
@@ -210,8 +209,6 @@ def ShowSysLicense(serObj, fileObj):
     print("Running show system license")
     WriteToSerial('show system license\r', serObj, fileObj)
     licenseID, custID = ParseLicenseFromSerial(serObj, fileObj)
-    print(custID)
-    print(licenseID)
     if len(custID) > 0 and len(licenseID) > 0:
         for elems in custID:
             print(f'Deleting license. Owner: {elems} ID: {licenseID[custID.index(elems)]}')
@@ -251,10 +248,17 @@ def ShowChasHw(serObj, fileObj):
     ReadFromSerial('root>', serObj, fileObj)
     return None 
 
-def ShowChasEnv(serObj, fileObj, model):
+def ShowChasEnv(serObj, fileObj, devID):
+    if devID.upper() == 'QFX5100':
+        input("Press enter when the device fans shut the fuck up.")
+
     print("Running show chassis environment...")
+    #Send an enter key into the device to clear the console spam 
+    WriteToSerial('\r', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj)
     WriteToSerial('show chassis environment | no-more\r', serObj, fileObj)
     #Loop to keep reading until the fans display status OK, FAILED, OR ABSENT.0
+    ReadFromSerial('root>', serObj, fileObj)
     # while True:
     #     if ReadFanStatusFromSerial(serObj, fileObj) is True:
     #         break
@@ -275,9 +279,10 @@ def ShowSysStorage(serObj, fileObj):
     ReadFromSerial('root>', serObj, fileObj)
     return None
 
-def ShowIntTerse(serObj, fileObj):
-    print("Suspending 10 seconds to allow interfaces to initialize...")
-    time.sleep(10)
+def ShowIntTerse(serObj, fileObj, devID):
+    if devID.upper() == 'EX3300':
+        print("Suspending 10 seconds to allow interfaces to initialize...")
+        time.sleep(10)
     print("Initialized. Running show interfaces terse...")
     WriteToSerial('show interfaces terse | no-more\r', serObj, fileObj)
     ReadFromSerial('root>', serObj, fileObj)
@@ -299,3 +304,8 @@ def ReqPwrOff(serObj, fileObj):
 
 if __name__ == "__main__":
     main()
+
+'''
+Double check EX3300 code compatibility
+See if the program can detect when QFX5100 fans are done testing instead of waiting for user input
+'''
