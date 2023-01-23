@@ -179,8 +179,8 @@ def ParseLicenseFromSerial(serObj, fileObj):
     return licenseID, custID
 
 #similar to readfromserial, but will only write if it finds an OK
-def ReadFanStatusFromSerial(serObj, fileObj):
-    return None
+# def ReadFanStatusFromSerial(serObj, fileObj):
+#     return None
 
 # https://stackoverflow.com/questions/11427138/python-wildcard-search-in-string
 def LoginRoot(serObj, fileObj):
