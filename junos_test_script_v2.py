@@ -1,18 +1,19 @@
 '''
 Python Script for Juniper EX3300 & QFX5100 Testing
 Dev: Hugo Wilson 
-1/17/2023
-v2.0
+1/23/2023
+v2.04
 '''
 
 import time
 import serial
 import sys 
+import re
 # import os.path 
 
 '''
 THIS SCRIPT WILL NOT BE ABLE TO HANDLE PASSWORD RESETS FOR NOW
-Commmand line inputs are: script.py COM# LPN### Device###
+Commmand line inputs are: script.py COM# Device### LPN### 
 '''
 def main():
     #get the  number of arguments input into the cmd line
@@ -20,13 +21,13 @@ def main():
 
     #error check the number of arguments
     if numArg != 4:
-        print("Invalid arguments. Expected 2. Commmand line format is: script.py COM# LPN### DEVICE####")
+        print("Invalid arguments. Expected 3. Commmand line format is: script.py COM# QFX5100/EX3300 LPN###")
         exit(-1)
 
     #error check the arguments to make sure they are valid. 
     connNum = sys.argv[1]
-    lpn = sys.argv[2]
-    devID = sys.argv[3]
+    devID = sys.argv[2]
+    lpn = sys.argv[3]
 
     if connNum[:3] != 'COM'and connNum[3:].isdigit() is False:
         print("Invalid Serial Console ID. Terminating program.")
@@ -51,7 +52,7 @@ def main():
     try:
         serObj = serial.Serial(connNum)
     except:
-        print("Unable to open serial connection. Serial connection does not exist, check COM number. Terminating program.")
+        print("Unable to open serial connection. Serial connection does not exist or may be busy. Check COM number. Terminating program.")
         exit(-1)
 
     serObj.baudrate = 9600  # set Baud rate to 9600
@@ -75,7 +76,6 @@ def main():
         exit(-1)
 
     print(f'Running testing script for Juniper {devID.upper()}')
-
     #Login then logout
     LoginRoot(serObj, fileObj)
     #verify and delete license if customer information exists
@@ -88,10 +88,8 @@ def main():
     ShowConfig(serObj, fileObj)
     ShowChasFw(serObj, fileObj)
     ShowChasHw(serObj, fileObj)
-
     #May have to wait until device quiets down, finishes testing
     ShowChasEnv(serObj, fileObj, devID)
-
     ShowSysAlarms(serObj, fileObj)
     ShowSysStorage(serObj, fileObj)
     #connect hardware and verify functionality 
@@ -104,9 +102,9 @@ def main():
 
     #read until device poweroff keyword is found
     if devID.upper() == 'EX3300':
-        ReadFromSerial("Please press any key to reboot.", serObj, fileObj)
+        ReadFromSerial("Please press any key to reboot.", serObj, fileObj, False)
     elif devID.upper() == 'QFX5100':
-        ReadFromSerial("Power down.", serObj, fileObj)
+        ReadFromSerial("Power down.", serObj, fileObj, False)
 
     print ("Script complete. Device safe to unplug. Terminating program.")
 
@@ -120,8 +118,10 @@ def WriteToSerial(cmd, serObj, fileObj):
     time.sleep(1)
     return None
 
-def ReadFromSerial(keyword, serObj, fileObj):
+def ReadFromSerial(keyword, serObj, fileObj, regexFlag):
     counter = 0
+    if regexFlag:
+        regex = re.compile(keyword)
     while True:
         try:
             readdata = serObj.readline().decode('ascii')
@@ -129,9 +129,13 @@ def ReadFromSerial(keyword, serObj, fileObj):
             continue
 
         if len(readdata) != 0:
+            #print(readdata)
             counter = 0
             fileObj.write(readdata.strip() + '\n')
-            if keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #string <> string.strip()
+            if regexFlag:
+                if re.match(regex, readdata.strip()) and len(keyword) == len(readdata.strip()): #string <> string.strip()
+                    break
+            elif keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #string <> string.strip()
                 break
         else:
             counter += 1
@@ -157,18 +161,17 @@ def ParseLicenseFromSerial(serObj, fileObj):
             continue
 
         if len(readdata) != 0:
+            # print(readdata)
             counter = 0
             fileObj.write(readdata.strip() + '\n')
-
             if "License identifier:" in readdata.strip():
                 licenseID.append(readdata.strip().split()[-1])
             elif "Customer ID:" in readdata.strip():
-                custID.append(readdata.strip().split()[-1])
+                custID.append(readdata.strip().split(':')[-1])
             elif keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #string <> string.strip()
                 break
         else:
             counter += 1
-
             if counter > 120:
                 print("Serial connection unresponive. 120 second timeout. Please manually check the device.")
                 fileObj.close()
@@ -179,70 +182,73 @@ def ParseLicenseFromSerial(serObj, fileObj):
 def ReadFanStatusFromSerial(serObj, fileObj):
     return None
 
+# https://stackoverflow.com/questions/11427138/python-wildcard-search-in-string
 def LoginRoot(serObj, fileObj):
     #Read boot sequence from serial
     print("Device booting up. This may take a moment...")
-    ReadFromSerial('login:', serObj, fileObj)
+    ReadFromSerial('login:', serObj, fileObj, False)
     #Read login from serial
     print("Entering default credentials...")
     WriteToSerial('root\r', serObj, fileObj)
-    ReadFromSerial('root@:RE:0%', serObj, fileObj)
+    ReadFromSerial('root@:..:0%', serObj, fileObj, True)
     #Read CLI from serial
     print('Entering CLI. This may take a moment...')
     WriteToSerial('cli\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 # def LogoutRoot(serObj, fileObj):
 #     print('Logging out of cli...')
 #     WriteToSerial('exit\r', serObj, fileObj)
-#     ReadFromSerial('root@:RE:0%', serObj, fileObj)
+#     ReadFromSerial('root@:..:0%', serObj, fileObj, True)
 #     print("Logging out of root...")
 #     WriteToSerial('exit\r', serObj, fileObj)
-#     ReadFromSerial('login:', serObj, fileObj)
+#     ReadFromSerial('login:', serObj, fileObj, False)
 #     return None
 
 def ShowSysLicense(serObj, fileObj):
     print("Running show system license...")
-    WriteToSerial('show system license\r', serObj, fileObj)
+    WriteToSerial('show system license | no-more\r', serObj, fileObj)
     licenseID, custID = ParseLicenseFromSerial(serObj, fileObj)
     if len(custID) > 0 and len(licenseID) > 0:
         for elems in custID:
             print(f'Deleting license:\n   Owner - {elems}\n   ID - {licenseID[custID.index(elems)]}')
             WriteToSerial('request system license delete ' + licenseID[custID.index(elems)] + '\r', serObj, fileObj)
-            ReadFromSerial('[yes,no] (no)', serObj, fileObj)
+            ReadFromSerial('[yes,no] (no)', serObj, fileObj, False)
             WriteToSerial('yes\r', serObj, fileObj)
-            ReadFromSerial('root>', serObj, fileObj)
+            ReadFromSerial('root>', serObj, fileObj, False)
+    else:
+        print("No sensitive license information found.")
     return None
 
 def IsMaster(serObj, fileObj):
     print("Checking virtual-chassis master status...")
     WriteToSerial('show virtual-chassis\r', serObj,fileObj)
-    ReadFromSerial('root>', serObj, fileObj)    
+    ReadFromSerial('root>', serObj, fileObj, False)    
     return None
 
 def ShowVersion(serObj, fileObj):
     print("Running show version...")
     WriteToSerial('show version\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 def ShowConfig(serObj, fileObj):
     print("Running show configuration...")
     WriteToSerial('show configuration | no-more\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None 
 
 def ShowChasFw(serObj, fileObj):
     print("Running show chassis firmware...")
     WriteToSerial('show chassis firmware\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 def ShowChasHw(serObj, fileObj):
     print("Running show chassis hardware...")
     WriteToSerial('show chassis hardware | no-more\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None 
 
 def ShowChasEnv(serObj, fileObj, devID):
@@ -250,23 +256,23 @@ def ShowChasEnv(serObj, fileObj, devID):
         input("Press enter when the device fans spin down.")
         #Clear cli spam by sending an input over serial 
         WriteToSerial('\r', serObj, fileObj)
-        ReadFromSerial('root>', serObj, fileObj)
+        ReadFromSerial('root>', serObj, fileObj, False)
+    
     print("Running show chassis environment...")
     WriteToSerial('show chassis environment | no-more\r', serObj, fileObj)
-    #Loop to keep reading until the fans display status OK, FAILED, OR ABSENT.0
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 def ShowSysAlarms(serObj, fileObj):
     print("Running show system alarms...")
     WriteToSerial('show system alarms | no-more\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 def ShowSysStorage(serObj, fileObj):
     print("Running show system storage...")
     WriteToSerial('show system storage | no-more\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 def ShowIntTerse(serObj, fileObj, devID):
@@ -275,20 +281,20 @@ def ShowIntTerse(serObj, fileObj, devID):
         time.sleep(10)
     print("Interfaces initialized. Running show interfaces terse...")
     WriteToSerial('show interfaces terse | no-more\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
+    ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 def ReqSysZero(serObj, fileObj):
-    print("Running system reboot...")
+    print("Running system wipe and reboot...")
     WriteToSerial('request system zeroize\r', serObj, fileObj)
-    ReadFromSerial('Erase all data, including configuration and log files? [yes,no] (no)', serObj, fileObj)    
+    ReadFromSerial('Erase all data, including configuration and log files? [yes,no] (no)', serObj, fileObj, False)    
     WriteToSerial('yes\r', serObj, fileObj)
     return None
 
 def ReqPwrOff(serObj, fileObj):
     print("Running graceful shutdown...")
     WriteToSerial('request system power-off\r', serObj, fileObj)
-    ReadFromSerial('Power Off the system ? [yes,no] (no)', serObj, fileObj)    
+    ReadFromSerial('Power Off the system ? [yes,no] (no)', serObj, fileObj, False)    
     WriteToSerial('yes\r', serObj, fileObj)
     return None
 
@@ -296,6 +302,5 @@ if __name__ == "__main__":
     main()
 
 '''
-Double check EX3300 code compatibility
 See if the program can detect when QFX5100 fans are done testing instead of waiting for user input
 '''
