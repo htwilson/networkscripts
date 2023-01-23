@@ -130,10 +130,8 @@ def ReadFromSerial(keyword, serObj, fileObj):
 
         if len(readdata) != 0:
             counter = 0
-            # print(readdata)
             fileObj.write(readdata.strip() + '\n')
             if keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #string <> string.strip()
-                print("FOUND KEYWORD")
                 break
         else:
             counter += 1
@@ -147,7 +145,7 @@ def ReadFromSerial(keyword, serObj, fileObj):
     return None
 
 def ParseLicenseFromSerial(serObj, fileObj):
-    print("parsing license...")
+    print("Parsing license information...")
     keyword = 'root>'
     licenseID = []
     custID = []
@@ -160,7 +158,6 @@ def ParseLicenseFromSerial(serObj, fileObj):
 
         if len(readdata) != 0:
             counter = 0
-            # print(readdata)
             fileObj.write(readdata.strip() + '\n')
 
             if "License identifier:" in readdata.strip():
@@ -196,22 +193,22 @@ def LoginRoot(serObj, fileObj):
     ReadFromSerial('root>', serObj, fileObj)
     return None
 
-def LogoutRoot(serObj, fileObj):
-    print('Logging out of cli...')
-    WriteToSerial('exit\r', serObj, fileObj)
-    ReadFromSerial('root@:RE:0%', serObj, fileObj)
-    print("Logging out of root...")
-    WriteToSerial('exit\r', serObj, fileObj)
-    ReadFromSerial('login:', serObj, fileObj)
-    return None
+# def LogoutRoot(serObj, fileObj):
+#     print('Logging out of cli...')
+#     WriteToSerial('exit\r', serObj, fileObj)
+#     ReadFromSerial('root@:RE:0%', serObj, fileObj)
+#     print("Logging out of root...")
+#     WriteToSerial('exit\r', serObj, fileObj)
+#     ReadFromSerial('login:', serObj, fileObj)
+#     return None
 
 def ShowSysLicense(serObj, fileObj):
-    print("Running show system license")
+    print("Running show system license...")
     WriteToSerial('show system license\r', serObj, fileObj)
     licenseID, custID = ParseLicenseFromSerial(serObj, fileObj)
     if len(custID) > 0 and len(licenseID) > 0:
         for elems in custID:
-            print(f'Deleting license. Owner: {elems} ID: {licenseID[custID.index(elems)]}')
+            print(f'Deleting license:\n   Owner - {elems}\n   ID - {licenseID[custID.index(elems)]}')
             WriteToSerial('request system license delete ' + licenseID[custID.index(elems)] + '\r', serObj, fileObj)
             ReadFromSerial('[yes,no] (no)', serObj, fileObj)
             WriteToSerial('yes\r', serObj, fileObj)
@@ -250,21 +247,14 @@ def ShowChasHw(serObj, fileObj):
 
 def ShowChasEnv(serObj, fileObj, devID):
     if devID.upper() == 'QFX5100':
-        input("Press enter when the device fans shut the fuck up.")
-
+        input("Press enter when the device fans spin down.")
+        #Clear cli spam by sending an input over serial 
+        WriteToSerial('\r', serObj, fileObj)
+        ReadFromSerial('root>', serObj, fileObj)
     print("Running show chassis environment...")
-    #Send an enter key into the device to clear the console spam 
-    WriteToSerial('\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj)
     WriteToSerial('show chassis environment | no-more\r', serObj, fileObj)
     #Loop to keep reading until the fans display status OK, FAILED, OR ABSENT.0
     ReadFromSerial('root>', serObj, fileObj)
-    # while True:
-    #     if ReadFanStatusFromSerial(serObj, fileObj) is True:
-    #         break
-    #     time.sleep(10)
-    #     WriteToSerial('show chassis environment | no-more\r', serObj, fileObj)
-
     return None
 
 def ShowSysAlarms(serObj, fileObj):
@@ -283,7 +273,7 @@ def ShowIntTerse(serObj, fileObj, devID):
     if devID.upper() == 'EX3300':
         print("Suspending 10 seconds to allow interfaces to initialize...")
         time.sleep(10)
-    print("Initialized. Running show interfaces terse...")
+    print("Interfaces initialized. Running show interfaces terse...")
     WriteToSerial('show interfaces terse | no-more\r', serObj, fileObj)
     ReadFromSerial('root>', serObj, fileObj)
     return None
