@@ -2,7 +2,7 @@
 Python Script for Juniper EX3300 & QFX5100 Testing
 Dev: Hugo Wilson 
 1/23/2023
-v2.05
+v3
 '''
 
 import time
@@ -124,9 +124,11 @@ def ReadFromSerial(keyword, serObj, fileObj, regexFlag):
         except UnicodeDecodeError:
             continue
         
+        #Check that the device has not logged you out
+        CheckIfLoggedOut(readdata, serObj, fileObj)
+
         if len(readdata) != 0:
             #print(readdata)
-            counter = 0
             fileObj.write(readdata.strip() + '\n')
             if regexFlag:
                 if re.match(regex, readdata.strip()) and len(keyword) == len(readdata.strip()): #string <> string.strip()
@@ -138,7 +140,7 @@ def ReadFromSerial(keyword, serObj, fileObj, regexFlag):
             # send enter into the serial to wakeup device every 10 seconds of inactivity
             if counter%10 == 0:
                 WriteToSerial('\r', serObj)
-            elif counter > 120:
+            elif counter > 300:
                 print("Serial connection unresponive. Please manually check the device and log.")
                 fileObj.close()
                 exit(-1)
@@ -178,21 +180,29 @@ def ParseLicenseFromSerial(serObj, fileObj):
                 exit(-1)
     return licenseID, custID
 
-#similar to readfromserial, but will only write if it finds an OK
-# def ReadFanStatusFromSerial(serObj, fileObj):
-#     return None
+def CheckIfLoggedOut(readdata, serObj, fileObj):
+    login = "login:"
+    rootPrompt = re.compile('root@:..:0%')
+    if login.strip() in readdata.strip() and len(login) == len(readdata.strip()):
+        print("Entering default credentials. This may take a moment...")
+        WriteToSerial('root\r', serObj)
+        ReadFromSerial('root@:..:0%', serObj, fileObj, True)
+    if re.match(rootPrompt, readdata.strip()) and len('root@:..:0%') == len(readdata.strip()):
+        print('Entering CLI. This may take a moment...')
+        WriteToSerial('cli\r', serObj)
+        ReadFromSerial('root>', serObj, fileObj, False)
 
 # LOGIN COMMANDS 
 # https://stackoverflow.com/questions/11427138/python-wildcard-search-in-string
 def LoginRoot(serObj, fileObj):
     print("Device booting up. This may take a moment...")
     ReadFromSerial('login:', serObj, fileObj, False)
-    print("Entering default credentials...")
-    WriteToSerial('root\r', serObj, fileObj)
-    ReadFromSerial('root@:..:0%', serObj, fileObj, True)
-    print('Entering CLI. This may take a moment...')
-    WriteToSerial('cli\r', serObj, fileObj)
-    ReadFromSerial('root>', serObj, fileObj, False)
+    # print("Entering default credentials...")
+    # WriteToSerial('root\r', serObj)
+    # ReadFromSerial('root@:..:0%', serObj, fileObj, True)
+    # print('Entering CLI. This may take a moment...')
+    # WriteToSerial('cli\r', serObj)
+    # ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 # LOGOUT COMMANDS (FOR DEBUG ONLY, NO NEED TO REBOOT DEVICE)
@@ -295,7 +305,6 @@ def ShowSysAlarms(serObj, fileObj):
     WriteToSerial('show system alarms | no-more\r', serObj)
     ReadFromSerial('root>', serObj, fileObj, False)
     return None
-
 # SHOW SYSTEM STORAGE COMMANDS 
 def ShowSysStorage(serObj, fileObj):
     print("Running show system storage...")
