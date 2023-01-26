@@ -188,20 +188,20 @@ def LoginRoot(serObj, fileObj):
     print("Device booting up. This may take a moment...")
     ReadFromSerial('login:', serObj, fileObj, False)
     print("Entering default credentials...")
-    WriteToSerial('root\r', serObj, fileObj)
+    WriteToSerial('root\r', serObj)
     ReadFromSerial('root@:..:0%', serObj, fileObj, True)
     print('Entering CLI. This may take a moment...')
-    WriteToSerial('cli\r', serObj, fileObj)
+    WriteToSerial('cli\r', serObj)
     ReadFromSerial('root>', serObj, fileObj, False)
     return None
 
 # LOGOUT COMMANDS (FOR DEBUG ONLY, NO NEED TO REBOOT DEVICE)
 # def LogoutRoot(serObj, fileObj):
 #     print('Logging out of cli...')
-#     WriteToSerial('exit\r', serObj, fileObj)
+#     WriteToSerial('exit\r', serObj)
 #     ReadFromSerial('root@:..:0%', serObj, fileObj, True)
 #     print("Logging out of root...")
-#     WriteToSerial('exit\r', serObj, fileObj)
+#     WriteToSerial('exit\r', serObj)
 #     ReadFromSerial('login:', serObj, fileObj, False)
 #     return None
 
