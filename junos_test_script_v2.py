@@ -65,7 +65,7 @@ def main():
         exit(-1)
 
     try:
-        fileObj = open(lpn + '.txt', 'w')
+        fileObj = open(lpn + '.txt', 'a')
     except:
         print("Unable to open file for writing connection. Terminating program.")
         exit(-1)
@@ -324,8 +324,8 @@ def ReqSysZero(serObj, fileObj):
 # REQUEST POWER OFF COMMANDS 
 def ReqPwrOff(serObj, fileObj):
     print("Running graceful shutdown...")
-    WriteToSerial('request system power-off in 0.01\r', serObj)
-    ReadFromSerial('Power Off the system in 0.01? [yes,no] (no)', serObj, fileObj, False)    
+    WriteToSerial('request system power-off in 0\r', serObj)
+    ReadFromSerial('Power Off the system in 0? [yes,no] (no)', serObj, fileObj, False)    
     WriteToSerial('yes\r', serObj)
     return None
 
