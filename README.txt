@@ -1,7 +1,7 @@
 #####################################################################################################
 # 1/31/2023
 # Hugo Wilson
-                                        README
+# README
 #####################################################################################################
 
 Python Script for Testing Juniper Devices
@@ -40,7 +40,7 @@ Overview
 
 Contents 
     junos_test_script_v2.py
-        The script that automates some testing procedures for these juniper devices
+        The script that automates some testing procedures for Juniper EX3300 and QFX5100. 
 
 Notes
     Sometimes the device will log itself out, the script cannot handle this bug. 
