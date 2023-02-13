@@ -93,7 +93,6 @@ def main():
     ShowIntTerse(serObj, fileObj, devID)
     ReqSysZero(serObj, fileObj)
     LoginRoot(serObj, fileObj)
-    ShowSysLicense(serObj, fileObj)
     ReqPwrOff(serObj, fileObj)
 
     #read until device poweroff keyword is found
@@ -130,57 +129,41 @@ def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
             readdata = serObj.readline().decode('ascii')
         except UnicodeDecodeError:
             continue
-        
         if len(readdata) != 0:
-            print(readdata)
+            # print(readdata)
             fileObj.write(readdata.strip() + '\n')
-
             if regexFlag: #match keyword using regex
                 if re.match(regex, readdata.strip()): 
                     break
-
             elif keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): 
                 break
-
             elif keystroke != None: #if a keystroke is specified, write to the serial
                 WriteToSerial(keystroke, serObj)
-
             elif "License identifier:" in readdata.strip(): #if license information is found 
                 licenseID.append(readdata.strip().split()[-1])
-                
             elif "Customer ID:" in readdata.strip():#if customer information is found 
-                custID.append(readdata.strip().split(':')[-1])
-            
+                custID.append(readdata.strip().split(':')[-1])           
             elif "Host 0 Boot from backup root" in readdata.strip(): #primary partition is corrupted. Must manually test this device 
                 print("Device has booted off the backup image. Manual configuration is required to resolve this.")
                 fileObj.close()
                 serObj.close()
                 exit(-1)
-            
-            # elif "login:" in readdata.strip() and len("login:") == len(readdata.strip()):
-            #     print("Involuntary logout detected or initial login detected.")
-
         else:
             counter += 1
             # print(f'Counter is at: {counter}')
             if counter % 10 == 0:
                 WriteToSerial('\r', serObj)
-            elif counter > 240:
-                print("Serial connection unresponive after 180 seconds. Please manually check the device and log.")
+            elif counter > 300:
+                print("Serial connection unresponive. Please manually check the device and log.")
                 fileObj.close()
                 serObj.close()
                 exit(-1)
-
     return licenseID, custID
-
-def VerifyResults():
-    return None
 
 #spacebar is \40
 def ResetPasswd(serObj, fileObj, devID):
     if devID.upper() == "QFX5100":
         print("Booting into single user mode for QFX5100...")
-        # ReadFromSerial("Hit [Enter] to boot immediately, or space bar for command prompt.", serObj, fileObj, False)
         ReadFromSerial("Welcome to CentOS", None, serObj, fileObj, False)
         ReadFromSerial('OK', '\40\r', serObj, fileObj, False)
         WriteToSerial("boot -s\r", serObj)
