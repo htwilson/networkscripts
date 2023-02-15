@@ -1,8 +1,8 @@
 '''
 Python Script for Juniper EX3300 & QFX5100 Testing
 Dev: Hugo Wilson 
-2/3/2023
-v3.01
+2/15/2023
+v3.02
 '''
 
 import time
@@ -11,7 +11,6 @@ import sys
 import re
 
 '''
-THIS SCRIPT WILL NOT BE ABLE TO HANDLE PASSWORD RESETS FOR NOW
 Commmand line inputs are: script.py COM# Device### LPN### 
 '''
 def main():
@@ -74,10 +73,8 @@ def main():
     print(f'Running testing script for Juniper {devID.upper()}')
     
     # Functions that handle I/O operations for commands 
-    if (devID.upper() == 'QFX5100'):
-        ResetPasswd(serObj, fileObj, devID)
-        ReqSysZero(serObj, fileObj)
-
+    # If the device is a QFX5100, run password reset and zeroize 
+    ResetPasswd(serObj, fileObj, devID)
     LoginRoot(serObj, fileObj)
     ShowConfig(serObj, fileObj)
     EditConfig(serObj, fileObj)
@@ -95,7 +92,7 @@ def main():
     LoginRoot(serObj, fileObj)
     ReqPwrOff(serObj, fileObj)
 
-    #read until device poweroff keyword is found
+    #Read from serial until device poweroff keyword is found
     if devID.upper() == 'EX3300':
         ReadFromSerial("Please press any key to reboot.", None, serObj, fileObj, False)
     else:
@@ -122,13 +119,18 @@ def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
     licenseID = []
     custID = []
     counter = 0
+    #if a regex flag is specified, match keyword using regex
     if regexFlag:
         regex = re.compile(keyword)
+    
+    #Infinite loop to keep listening from serial until a keyword is found 
     while True:
         try:
             readdata = serObj.readline().decode('ascii')
         except UnicodeDecodeError:
             continue
+
+        #If there is data receieved from the serial connection,  write to file and parse for keywords 
         if len(readdata) != 0:
             # print(readdata)
             fileObj.write(readdata.strip() + '\n')
@@ -148,6 +150,8 @@ def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
                 fileObj.close()
                 serObj.close()
                 exit(-1)
+        
+        #No data was recieved on the serial connection, increase the idle counter, send enter to wake up CLI if its idle
         else:
             counter += 1
             # print(f'Counter is at: {counter}')
@@ -158,9 +162,10 @@ def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
                 fileObj.close()
                 serObj.close()
                 exit(-1)
+
     return licenseID, custID
 
-#spacebar is \40
+#SEQUENCE OF COMMANDS TO GAIN ROOT MODE ON PASSWORD LOCKED DEVICE (QFX only)
 def ResetPasswd(serObj, fileObj, devID):
     if devID.upper() == "QFX5100":
         print("Booting into single user mode for QFX5100...")
@@ -173,6 +178,7 @@ def ResetPasswd(serObj, fileObj, devID):
         ReadFromSerial("continue, shell, abort, retry, or reboot ?", None, serObj, fileObj, False)
         WriteToSerial("continue\r", serObj)
         ReadFromSerial("root>", None, serObj, fileObj, False)
+        ReqSysZero(serObj, fileObj) # Remove if EX3300 password reset is sucessfully implemented 
     # else:
         # print("Booting into single user mode for EX3300...")
         # ReadFromSerial('=> <INTERRUPT>', '\03', serObj, fileObj, False)
@@ -188,6 +194,7 @@ def ResetPasswd(serObj, fileObj, devID):
         # # ReadFromSerial("continue, shell, abort, retry, or reboot ?", None, serObj, fileObj, False)
         # # WriteToSerial("continue\r", serObj)
         # ReadFromSerial("^root", None, serObj, fileObj, True)
+    # ReqSysZero(serObj, fileObj)
     return None
 
 # LOGIN COMMANDS 
@@ -240,6 +247,7 @@ def ShowSysLicense(serObj, fileObj):
     print("Running show system license...")
     WriteToSerial('show system license | no-more\r', serObj)
     licenseID, custID = ReadFromSerial('root>', None, serObj, fileObj, False)
+    #If customers and license IDs are found, proceed to delete them 
     if custID and licenseID:
         print("License information found.")
         for elems in custID:
@@ -291,9 +299,6 @@ def ShowChasHw(serObj, fileObj):
 def ShowChasEnv(serObj, fileObj, devID):
     if devID.upper() == 'QFX5100':
         input("Press enter when the device fans spin down.")
-        #Clear cli spam by sending an input over serial 
-        # WriteToSerial('\r', serObj)
-        # ReadFromSerial('root>', serObj, fileObj, False)
     print("Running show chassis environment...")
     WriteToSerial('show chassis environment | no-more\r', serObj)
     ReadFromSerial('root>', None, serObj, fileObj, False)
@@ -344,14 +349,8 @@ if __name__ == "__main__":
 
 '''
 TODO:
-TEST EX3300 FUNCTIONALITY, ENSURE THAT DEVICE DOES NOT LOGOUT PREMATURELY 
-CLEAN CODE, VERIFY SIMPLICITY 
-
 Recovering backup image (INC) - may not implement 
 Handle password resets for the EX3300 (WIP, Not possible to do without corrupting the image)
-Handle password resets for the QFX5100 (COMPLETE)
 See if the program can detect when QFX5100 fans are done testing instead of waiting for user input (INC)
-Sometimes the device will log the user out unexpectedly, may have to implement change to handle that (COMPLETE)
-Consolidate all read functions into a single one (COMPLETE)
 GLOBAL LIST THAT CHECKS THAT CERTAIN TESTS WERE PASSED, WRITES RESULTS TO CONSOLE, END OF FILE
 '''
