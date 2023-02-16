@@ -114,6 +114,7 @@ def WriteToSerial(cmd, serObj):
 '''
 Reads output from serObj connection in a listening loop until a keyword or regex is found. 
 Toggle regex detecting by setting regexFlag true, else it will do string matching 
+Can specify a keystroke using ASCII code to enable the code to break into specific modes during boot. 
 '''
 def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
     licenseID = []
