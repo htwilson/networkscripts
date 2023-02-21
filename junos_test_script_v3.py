@@ -1,8 +1,8 @@
 '''
 Python Script for Juniper EX3300 & QFX5100 Testing
 Dev: Hugo Wilson 
-2/15/2023
-v3.02
+2/20/2023
+v3.03
 '''
 
 import time
@@ -78,8 +78,8 @@ def main():
     LoginRoot(serObj, fileObj)
     ShowConfig(serObj, fileObj)
     EditConfig(serObj, fileObj)
-    ShowSysLicense(serObj, fileObj)
-    ShowSysLicense(serObj, fileObj)
+    while ShowSysLicense(serObj, fileObj):
+        continue
     ShowSysAlarms(serObj, fileObj)  
     IsMaster(serObj, fileObj)
     ShowVersion(serObj, fileObj)
@@ -138,7 +138,7 @@ def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
             if regexFlag: #match keyword using regex
                 if re.match(regex, readdata.strip()): 
                     break
-            elif keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): 
+            elif keyword.strip() in readdata.strip() and len(keyword) == len(readdata.strip()): #match keyword checking len() and finding keyword in string
                 break
             elif keystroke != None: #if a keystroke is specified, write to the serial
                 WriteToSerial(keystroke, serObj)
@@ -151,6 +151,14 @@ def ReadFromSerial(keyword, keystroke, serObj, fileObj, regexFlag):
                 fileObj.close()
                 serObj.close()
                 exit(-1)
+            elif "error: the chassis-control subsystem is not running" in readdata.strip(): #The device may be stuck in linecard mode after reset 
+                print("Device is stuck in linecard mode. Manual configuration is required to resolve this.")
+                fileObj.close()
+                serObj.close()
+                exit(-1)
+            elif "remote side unexpectedly closed connection" in readdata.strip(): #the cli unexpectedly closed, log back in
+                print("Remote side unexpectedly closed cli, reestablishing connection...") 
+                WriteToSerial('cli\r', serObj)
         
         #No data was recieved on the serial connection, increase the idle counter, send enter to wake up CLI if its idle
         else:
@@ -257,9 +265,10 @@ def ShowSysLicense(serObj, fileObj):
             ReadFromSerial('[yes,no] (no)', None, serObj, fileObj, False)
             WriteToSerial('yes\r', serObj)
             ReadFromSerial('root>', None, serObj, fileObj, False)
+        return True
     else:
         print("No sensitive license information found.")
-    return None
+        return False
 
 # SHOW VIRTUAL-CHASSIS MASTER STATUS COMMANDS 
 def IsMaster(serObj, fileObj):
@@ -299,7 +308,7 @@ def ShowChasHw(serObj, fileObj):
 # SHOW CHASSIS ENVIRONMENTALS COMMANDS 
 def ShowChasEnv(serObj, fileObj, devID):
     if devID.upper() == 'QFX5100':
-        input("Press enter when the device fans spin down.")
+        input("Press ENTER when the device fans spin down.")
     print("Running show chassis environment...")
     WriteToSerial('show chassis environment | no-more\r', serObj)
     ReadFromSerial('root>', None, serObj, fileObj, False)
@@ -355,3 +364,6 @@ Handle password resets for the EX3300 (WIP, Not possible to do without corruptin
 See if the program can detect when QFX5100 fans are done testing instead of waiting for user input (INC)
 GLOBAL LIST THAT CHECKS THAT CERTAIN TESTS WERE PASSED, WRITES RESULTS TO CONSOLE, END OF FILE
 '''
+
+# cli: remote side unexpectedly closed connection
+# error: remote side unexpectedly closed connection
