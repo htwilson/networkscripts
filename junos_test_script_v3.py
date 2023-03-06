@@ -273,14 +273,14 @@ def ShowSysLicense(serObj, fileObj):
 # SHOW VIRTUAL-CHASSIS MASTER STATUS COMMANDS 
 def IsMaster(serObj, fileObj):
     print("Checking virtual-chassis master status...")
-    WriteToSerial('show virtual-chassis\r', serObj)
+    WriteToSerial('show virtual-chassis | no-more\r', serObj)
     ReadFromSerial('root>', None, serObj, fileObj, False)    
     return None
 
 # SHOW VERSION COMMANDS 
 def ShowVersion(serObj, fileObj):
     print("Running show version...")
-    WriteToSerial('show version\r', serObj)
+    WriteToSerial('show version | no-more\r', serObj)
     ReadFromSerial('root>', None, serObj, fileObj, False)
     return None
 
@@ -294,7 +294,7 @@ def ShowConfig(serObj, fileObj):
 # SHOW CHASSIS FIRMWARE COMMANDS 
 def ShowChasFw(serObj, fileObj):
     print("Running show chassis firmware...")
-    WriteToSerial('show chassis firmware\r', serObj)
+    WriteToSerial('show chassis firmware | no-more\r', serObj)
     ReadFromSerial('root>', None, serObj, fileObj, False)
     return None
 
